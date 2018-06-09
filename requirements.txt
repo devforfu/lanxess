@@ -1,0 +1,11 @@
+Flask==0.10.1
+flask-migrate
+flask-script
+flask-sqlalchemy
+itsdangerous
+sqlalchemy-migrate
+ptpython
+psycopg2
+pandas
+pytest
+fire
