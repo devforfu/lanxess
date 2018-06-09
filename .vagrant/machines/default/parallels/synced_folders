@@ -1,1 +1,0 @@
-{"parallels":{"/vagrant":{"guestpath":"/vagrant","hostpath":"/Users/ck/Code/Tasks/lanxess","disabled":false,"__vagrantfile":true},"/server":{"guestpath":"/server","hostpath":"/Users/ck/Code/Tasks/lanxess/src","disabled":false,"__vagrantfile":true}}}
