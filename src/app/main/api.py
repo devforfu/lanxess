@@ -7,6 +7,7 @@ from flask import jsonify, request, current_app
 from werkzeug.exceptions import HTTPException
 
 from . import main
+from .. import db
 from ..models import Employee, Candidate
 
 
@@ -35,8 +36,7 @@ def employee_endpoint():
     if request.method == 'GET':
         employee = Employee.query.filter_by(**payload).first()
         if employee is None:
-            fullname = '{first_name} {last_name}'.format(**payload)
-            return api_bad_request(f'employee not found: {fullname}')
+            return api_bad_request(f'employee not found: {employee.full_name}')
 
         interviews_records = [{
             'start': {
@@ -51,7 +51,31 @@ def employee_endpoint():
         payload['interviews'] = interviews_records
         return success(payload)
 
+    elif request.method == 'POST':
+        if Employee.exists(**payload):
+            return api_bad_request('cannot create employee: the record already exist')
+
+        employee = Employee(**payload)
+        db.session.add(employee)
+        db.session.commit()
+        return success({'id': employee.id})
+
+    elif request.method == 'DELETE':
+        employee = Employee.query.filter_by(**payload).first()
+        if employee is None:
+            return api_bad_request(
+                f'cannot delete non-existing employee: {employee.full_name}')
+
+        db.session.delete(employee)
+        db.session.commit()
+        return success({'id': employee.id})
+
     return api_bad_request('not implemented')
+
+
+@main.route('/api/v1/employee', methods=['GET', 'POST', 'DELETE'])
+def candidate_endpoint():
+    pass
 
 
 def success(data=None):

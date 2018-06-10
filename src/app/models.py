@@ -33,6 +33,16 @@ class Employee(db.Model):
                                    backref='employee',
                                    passive_deletes='all')
 
+    @property
+    def full_name(self):
+        return f'{self.first_name} {self.last_name}'
+
+    @staticmethod
+    def exists(first_name, last_name):
+        employee = Employee.query.filter_by(
+            first_name=first_name, last_name=last_name).first()
+        return employee is not None
+
 
 class Candidate(db.Model):
     """Interviewed candidate."""
