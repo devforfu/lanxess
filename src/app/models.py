@@ -5,9 +5,12 @@ from sqlalchemy.dialects.postgresql import ENUM
 from . import db
 
 
+TIMESLOT_DURATION = 15
+MINUTES_PER_HOUR = 60
+
 days_of_week = tuple(day_name)
 hours = [str(x) for x in range(24)]
-minutes_granularity = [str(x) for x in  (0, 15, 30, 45)]
+minutes_granularity = [str(x) for x in range(0, 60, TIMESLOT_DURATION)]
 
 days_of_week_enum = ENUM(*days_of_week, name='days_of_week')
 hours_enum = ENUM(*hours, name='hours')
@@ -21,10 +24,15 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(32), nullable=False)
     last_name = db.Column(db.String(64), nullable=False)
+    interviews = db.relationship('Interview',
+                                 uselist=True,
+                                 backref='employee',
+                                 passive_deletes='all')
     availability = db.relationship('EmployeeTimeslot',
                                    uselist=True,
                                    backref='employee',
                                    passive_deletes='all')
+
 
 class Candidate(db.Model):
     """Interviewed candidate."""
@@ -87,3 +95,16 @@ class Interview(db.Model):
         nullable=False)
     start = db.Column(db.Integer, db.ForeignKey('timeslots.id'), nullable=False)
     duration_in_timeslots = db.Column(db.Integer, nullable=False)
+
+    @property
+    def verbose_start(self):
+        start = self.start
+        verbose = f'On {start.day} at {int(start.hour):02d}:{int(start.minute):02d}'
+        return verbose
+
+    @property
+    def verbose_duration(self):
+        minutes = TIMESLOT_DURATION * self.duration_in_timeslots
+        whole_hours = minutes // MINUTES_PER_HOUR
+        rest_of_minutes = minutes - (hours * MINUTES_PER_HOUR)
+        return f'{whole_hours}h {rest_of_minutes}m'

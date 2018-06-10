@@ -108,3 +108,6 @@ venv.bak/
 
 # Vargrant
 .vagrant
+
+# Environments
+environment_local.env
