@@ -15,7 +15,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # -------
 
 
-LOGS_DIR = os.path.expanduser(os.path.join('~', 'logs', 'location_tracker'))
+LOGS_DIR = os.path.expanduser(os.path.join('~', 'logs', 'lanxess'))
 
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
