@@ -36,9 +36,9 @@ class PersonMixin:
     def full_name(self):
         return f'{self.first_name} {self.last_name}'
 
-    @staticmethod
-    def exists(first_name, last_name):
-        employee = Employee.query.filter_by(
+    @classmethod
+    def exists(cls, first_name, last_name):
+        employee = cls.query.filter_by(
             first_name=first_name, last_name=last_name).first()
         return employee is not None
 
@@ -57,7 +57,7 @@ class Employee(PersonMixin, db.Model):
                                  passive_deletes='all')
 
 
-class Candidate(db.Model):
+class Candidate(PersonMixin, db.Model):
     """Interviewed candidate."""
 
     __tablename__ = 'candidates'
@@ -67,6 +67,10 @@ class Candidate(db.Model):
     skype = db.Column(db.String(64), default=None)
     email = db.Column(db.String(254), nullable=False)
     availability = db.relationship('Timeslot', secondary=candidate_timeslots)
+    interview = db.relationship('Interview',
+                                uselist=False,
+                                backref='candidate',
+                                passive_deletes='all')
 
 
 class Timeslot(db.Model):

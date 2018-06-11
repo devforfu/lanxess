@@ -39,7 +39,7 @@ def employee_endpoint():
     if request.method == 'GET':
         employee = Employee.query.filter_by(**payload).first()
         if employee is None:
-            return api_bad_request(f'employee not found: {employee.full_name}')
+            return api_bad_request(f'employee is not found')
 
         interviews_records = [{
             'start': {
@@ -66,17 +66,79 @@ def employee_endpoint():
     elif request.method == 'DELETE':
         employee = Employee.query.filter_by(**payload).first()
         if employee is None:
-            return api_bad_request(
-                f'cannot delete non-existing employee: {employee.full_name}')
+            return api_bad_request('cannot delete non-existing employee')
 
         db.session.delete(employee)
         db.session.commit()
         return success({'id': employee.id})
 
 
-@main.route('/api/v1/employee', methods=['GET', 'POST', 'DELETE'])
+@main.route('/api/v1/candidate', methods=['GET', 'POST', 'DELETE'])
 def candidate_endpoint():
-    pass
+    """
+    Manages employees responsible to carry out interviews.
+
+    Required parameters:
+        * first_name (str): The first name of employee.
+        * last_name (str): The last name of employee.
+
+    POST-specific parameters:
+        * email (str): Candidate's email
+        * skype (str): Candidate's Skype
+
+    """
+    ok, result = _get_json_keys('first_name', 'last_name')
+    if not ok:
+        return result.error
+
+    payload = result.payload
+
+    if request.method == 'GET':
+        candidate = Candidate.query.filter_by(**payload).first()
+        if candidate is None:
+            return api_bad_request(f'candidate is not found')
+
+        record = payload.copy()
+        record['email'] = candidate.email
+        record['skype'] = candidate.skype or ''
+
+        if candidate.interview is not None:
+            interview_obj = candidate.interview
+            interview = {
+                'start': {
+                    'day': interview_obj.start.day,
+                    'hour': interview_obj.start.hour,
+                    'minute': interview_obj.start.minute},
+                'start_verbose': interview_obj.verbose_start,
+                'duration_in_minutes': interview_obj.duration_in_minutes,
+                'duration_verbose': interview_obj.verbose_duration}
+            record['interview'] = interview
+
+        return success(record)
+
+    elif request.method == 'POST':
+        if Candidate.exists(**payload):
+            return api_bad_request('cannot create candidate: the record already exist')
+
+        email = request.json.get('email')
+        if email is None:
+            return api_bad_request('cannot create candidate without email')
+
+        payload['email'] = email
+        payload['skype'] = request.json.get('skype')
+        candidate = Candidate(**payload)
+        db.session.add(candidate)
+        db.session.commit()
+        return success({'id': candidate.id})
+
+    elif request.method == 'DELETE':
+        candidate = Candidate.query.filter_by(**payload).first()
+        if candidate is None:
+            return api_bad_request('cannot delete non-existing candidate')
+
+        db.session.delete(candidate)
+        db.session.commit()
+        return success({'id': candidate.id})
 
 
 @main.route('/api/v1/allocate_employee_time', methods=['POST'])
