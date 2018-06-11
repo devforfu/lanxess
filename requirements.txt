@@ -6,6 +6,4 @@ itsdangerous
 sqlalchemy-migrate
 ptpython
 psycopg2-binary
-pandas
 pytest
-fire
