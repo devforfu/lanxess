@@ -1,6 +1,7 @@
 """
 Interviews management API.
 """
+import re
 from collections import namedtuple
 
 from flask import jsonify, request, current_app
@@ -8,7 +9,9 @@ from werkzeug.exceptions import HTTPException
 
 from . import main
 from .. import db
-from ..models import Employee, Candidate
+from ..models import days_of_week, TIMESLOT_DURATION
+from ..models import Employee, Candidate, Timeslot
+from ..models import entity_with_id
 
 
 @main.route('/api/v1/echo', methods=['GET'])
@@ -70,12 +73,94 @@ def employee_endpoint():
         db.session.commit()
         return success({'id': employee.id})
 
-    return api_bad_request('not implemented')
-
 
 @main.route('/api/v1/employee', methods=['GET', 'POST', 'DELETE'])
 def candidate_endpoint():
     pass
+
+
+@main.route('/api/v1/allocate_employee_time', methods=['POST'])
+def allocate_employee_time():
+    """
+    Allocates free timeslots for interview for employee or candidate.
+
+    Required parameters:
+        * employee_id (int): An ID of employee to allocate time.
+        * day (str): An interview day.
+        * time (str): Time value in format 'hh:mm', converted to the closest discrete timeslot.
+
+    """
+    req = TimeAllocationRequest(request, ('employee_id', 'day', 'time'))
+    if not req.validate():
+        return req.error
+
+    timeslot = req.create_or_query_timeslot()
+    employee_id = req.parsed('employee_id')
+    employee = entity_with_id(Employee, employee_id)
+    if employee is None:
+        return api_bad_request('employee ID=%d does not exist' % employee_id)
+
+    if timeslot not in employee.availability:
+        employee.availability.append(timeslot)
+
+    return _create_availability_response(employee)
+
+
+class TimeAllocationRequest:
+
+    def __init__(self, request_obj, expected_keys, time_regex='^(\d\d)?:(\d\d)?$'):
+        self.request_obj = request_obj
+        self.expected_keys = expected_keys
+        self.time_regex = time_regex
+        self._error = None
+        self._params = None
+        self._parsed = None
+
+    @property
+    def error(self):
+        return self._error
+
+    def parsed(self, value):
+        if value not in self._parsed:
+            raise KeyError('unknown request parameter: %s' % value)
+        return self._parsed[value]
+
+    def validate(self):
+        ok, result = _get_json_keys(*self.expected_keys)
+
+        if not ok:
+            self._error = result.error
+            return False
+
+        person_id, day, time = _unwrap(self.expected_keys, result.payload)
+
+        if day not in days_of_week:
+            self._error = api_bad_request('invalid day of weeK: %s' % day)
+            return False
+
+        match = re.match(self.time_regex, time)
+        if match is None:
+            self._error = api_bad_request('invalid time format')
+            return False
+
+        hour, minute = [int(x) for x in match.groups()]
+        if not (0 <= hour < 23) or not (0 <= minute <= 59):
+            self._error = api_bad_request('time out of range')
+            return False
+
+        minute_rounded = TIMESLOT_DURATION * (minute // TIMESLOT_DURATION)
+        params = dict(day=day, hour=str(hour), minute=str(minute_rounded))
+        self._params = params
+        self._parsed = result.payload
+        return True
+
+    def create_or_query_timeslot(self):
+        timeslot = Timeslot.query.filter_by(**self._params).first()
+        if timeslot is None:
+            timeslot = Timeslot(**self._params)
+            db.session.add(timeslot)
+            db.session.commit()
+        return timeslot
 
 
 def success(data=None):
@@ -166,3 +251,19 @@ def _get_json_keys(key, *keys):
                 error=api_bad_request('missing request parameter: %s' % key),
                 payload=None)
     return True, result(error=None, payload=payload)
+
+
+def _unwrap(keys, dictionary, default=None):
+    return [dictionary.get(key, default) for key in keys]
+
+
+def _create_availability_response(person):
+    result = {
+         'id': person.id,
+         'person': person.full_name,
+         'timeslots': [
+            {'day': ts.day,
+             'hour': int(ts.hour),
+             'minute': int(ts.minute)}
+            for ts in person.availability]}
+    return success(result)

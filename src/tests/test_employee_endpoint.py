@@ -1,7 +1,7 @@
 import pytest
 
 from app import db
-from app.models import Employee, Candidate, Interview
+from app.models import Employee
 
 
 def test_getting_employee(client, mockery):

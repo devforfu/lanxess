@@ -17,21 +17,20 @@ hours_enum = ENUM(*hours, name='hours')
 minutes_enum = ENUM(*minutes_granularity, name='minutes')
 
 
-class Employee(db.Model):
-    """Company's employee responsible for carrying out interviews."""
+employee_timeslots = db.Table(
+    'employee_timeslots',
+    db.Column('employee_id', db.Integer, db.ForeignKey('employees.id')),
+    db.Column('timeslots_id', db.Integer, db.ForeignKey('timeslots.id')))
 
-    __tablename__ = 'employees'
-    id = db.Column(db.Integer, primary_key=True)
-    first_name = db.Column(db.String(32), nullable=False)
-    last_name = db.Column(db.String(64), nullable=False)
-    interviews = db.relationship('Interview',
-                                 uselist=True,
-                                 backref='employee',
-                                 passive_deletes='all')
-    availability = db.relationship('EmployeeTimeslot',
-                                   uselist=True,
-                                   backref='employee',
-                                   passive_deletes='all')
+
+candidate_timeslots = db.Table(
+    'candidate_timeslots',
+    db.Column('candidate_id', db.Integer, db.ForeignKey('candidates.id')),
+    db.Column('timeslots_id', db.Integer, db.ForeignKey('timeslots.id')))
+
+
+class PersonMixin:
+    """Common computed properties and methods for employees and candidates."""
 
     @property
     def full_name(self):
@@ -44,6 +43,20 @@ class Employee(db.Model):
         return employee is not None
 
 
+class Employee(PersonMixin, db.Model):
+    """Company's employee responsible for carrying out interviews."""
+
+    __tablename__ = 'employees'
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(32), nullable=False)
+    last_name = db.Column(db.String(64), nullable=False)
+    availability = db.relationship('Timeslot', secondary=employee_timeslots)
+    interviews = db.relationship('Interview',
+                                 uselist=True,
+                                 backref='employee',
+                                 passive_deletes='all')
+
+
 class Candidate(db.Model):
     """Interviewed candidate."""
 
@@ -53,31 +66,7 @@ class Candidate(db.Model):
     last_name = db.Column(db.String(64), nullable=False)
     skype = db.Column(db.String(64), default=None)
     email = db.Column(db.String(254), nullable=False)
-    availability = db.relationship('CandidateTimeslot',
-                                   uselist=True,
-                                   backref='candidate',
-                                   passive_deletes='all')
-
-
-class EmployeeTimeslot(db.Model):
-    """Interviewer's free timeslots."""
-
-    __tablename__ = 'employees_timeslots'
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(
-        db.Integer, db.ForeignKey('employees.id', ondelete='CASCADE'))
-    timeslot_id = db.Column(
-        db.Integer, db.ForeignKey('timeslots.id'))
-
-
-class CandidateTimeslot(db.Model):
-    """Candidate's free timeslots."""
-
-    __tablename__ = 'candidates_timeslots'
-    id = db.Column(db.Integer, primary_key=True)
-    candidate_id = db.Column(
-        db.Integer, db.ForeignKey('candidates.id', ondelete='CASCADE'))
-    timeslot_id = db.Column(db.Integer, db.ForeignKey('timeslots.id'))
+    availability = db.relationship('Timeslot', secondary=candidate_timeslots)
 
 
 class Timeslot(db.Model):
@@ -118,3 +107,7 @@ class Interview(db.Model):
         whole_hours = minutes // MINUTES_PER_HOUR
         rest_of_minutes = minutes - (hours * MINUTES_PER_HOUR)
         return f'{whole_hours}h {rest_of_minutes}m'
+
+
+def entity_with_id(entity_cls, id_value):
+    return entity_cls.query.filter_by(id=id_value).first()
