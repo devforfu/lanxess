@@ -168,7 +168,63 @@ def allocate_employee_time():
     return _create_availability_response(employee)
 
 
+@main.route('/api/v1/allocate_candidate_time', methods=['POST'])
+def allocate_candidate_time():
+    return api_bad_request('not implemented')
+
+
+@main.route('/api/v1/list_interviews', methods=['GET'])
+def list_interviews():
+    """
+    Returns list of available interview timeslots for a specific candidate and a given
+    list of interviewers.
+
+    Required parameters:
+        * candidate (int): An ID of interviewed candidate.
+        * employees (list): A list of employees considered to carry out interview.
+
+    """
+    keys = 'candidate', 'employees'
+    ok, result = _get_json_keys(*keys)
+    if not ok:
+        return result.error
+
+    candidate_id, employees_list = _unwrap(keys, result.payload)
+    candidate = entity_with_id(Candidate, candidate_id)
+    if candidate is None:
+        return api_bad_request('candidate with ID=%d is not found' % candidate_id)
+
+    employees = Employee.query.filter(Employee.id.in_(employees_list))
+    schedule = []
+    for employee in employees:
+        common_timeslots = [
+            ts for ts in employee.availability if ts in candidate.availability]
+        if not common_timeslots:
+            continue
+        for timeslot in common_timeslots:
+            record = {
+                'interviewer': employee.full_name,
+                'day': timeslot.day,
+                'hour': timeslot.hour,
+                'minute': timeslot.minute}
+            schedule.append(record)
+
+    if not schedule:
+        return api_bad_request('no available timeslots')
+
+    return success({'schedule': schedule})
+
+
+@main.route('/api/v1/interview', methods=['GET', 'POST', 'DELETE'])
+def interview_endpoint():
+    return api_bad_request('not implemented')
+
+
 class TimeAllocationRequest:
+    """
+    Helper class to parse time allocation request parameters and return new or existing
+    timeslot object to be included into person's availability list.
+    """
 
     def __init__(self, request_obj, expected_keys, time_regex='^(\d\d)?:(\d\d)?$'):
         self.request_obj = request_obj
